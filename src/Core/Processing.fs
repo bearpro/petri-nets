@@ -4,24 +4,34 @@ open System
 open System.Collections.Generic
 open Core.Types
 
+type private Delta = 
+    { Add: int; Sub: int }
+    with
+    member this.Inc n = { this with Add = this.Add + n}
+    member this.Dec n = { this with Sub = this.Sub + n}
+    member this.Value = this.Add - this.Sub
+
 let fire net = 
     let places = net.Places
-    let deltas = Array.create places.Length 0
-    for t_i in 0..net.Connections.GetLength(0)-1 do
+    let deltas = Array.create places.Length { Add = 0; Sub = 0 }
+    let mutable transitionFound = false
+    for t_i in 0..net.Arcs.GetLength(0)-1 do
         let canFire = seq { 
-            for p_i in 0..net.Connections.GetLength(1)-1 do
-                match net.Connections.[t_i, p_i] with
-                | From -> if places.[p_i].Value < 1 then yield () else ()
+            for p_i in 0..net.Arcs.GetLength(1)-1 do
+                match net.Arcs.[t_i, p_i] with
+                | From n -> if (places.[p_i].Tokens - deltas.[p_i].Sub) < n then yield () else ()
                 | _ -> () } |> Seq.isEmpty
         if canFire then 
-            for p_i in 0..net.Connections.GetLength(1)-1 do
-                match net.Connections.[t_i, p_i] with
-                | To -> deltas.[p_i] <- deltas.[p_i] + 1
-                | From -> deltas.[p_i] <- deltas.[p_i] - 1
-                | _ -> ()
-    let places' = 
-        Array.map2 
-            (fun place delta -> { place with Value = place.Value + delta }) 
-            places
-            deltas
-    { net with Places = places' }
+            transitionFound <- true
+            for p_i in 0..net.Arcs.GetLength(1)-1 do
+                let newDelta =
+                    match net.Arcs.[t_i, p_i] with
+                    | To n   -> deltas.[p_i].Inc n
+                    | From n -> deltas.[p_i].Dec n
+                    | None   -> deltas.[p_i]
+                deltas.[p_i] <- newDelta
+    if transitionFound then
+        let applyDelta place (delta: Delta) = { place with Tokens = place.Tokens + delta.Value }
+        let places' = Array.map2 applyDelta places deltas
+        Some { net with Places = places' }
+    else Option.None
