@@ -5,40 +5,23 @@ open System.Collections.Generic
 open Core.Types
 
 let fire net = 
-    let nodeMap = 
-        net.Nodes
-        |> List.map ^ fun node -> node.Name, node
-        |> dict
-        |> Dictionary
-
-    let leftConnections, rightConnections = 
-        net.Connections
-        |> List.partition ^ function 
-                          | PlaceToTransition _ -> true
-                          | TransitionToPlace _ -> false 
-
-    for lConnection in leftConnections do
-        match lConnection with
-        | PlaceToTransition(placeName, transitionName) -> 
-            let placeA = 
-                match nodeMap.[placeName] with 
-                | Place p -> p
-                | _ -> invalidOp $"Connection '%s{placeName}' -> '%s{transitionName}' invalid."
-            let value = placeA.Value
-            nodeMap.[placeName] <- Place { placeA with Value = value - 1}
-            for rConnection in rightConnections do
-                match rConnection with
-                | TransitionToPlace (transitionName', placeName) 
-                    when transitionName' = transitionName -> 
-                        let placeB = 
-                            match nodeMap.[placeName] with 
-                            | Place p -> p
-                            | _ -> invalidOp $"Connection '%s{placeName}' -> '%s{transitionName}' invalid."
-                        nodeMap.[placeName] <- Place { placeB with Value = placeB.Value + 1}
-                | TransitionToPlace _ -> ()
-                | _ -> failwith $"Invalid behavior of %s{nameof(rightConnections)}."
-                
-        | _ -> failwith $"Invalid behavior of %s{nameof(leftConnections)}."
-    { net with Nodes = nodeMap.Values |> List.ofSeq }
-
-
+    let places = net.Places
+    let deltas = Array.create places.Length 0
+    for t_i in 0..net.Connections.GetLength(0)-1 do
+        let canFire = seq { 
+            for p_i in 0..net.Connections.GetLength(1)-1 do
+                match net.Connections.[t_i, p_i] with
+                | From -> if places.[p_i].Value < 1 then yield () else ()
+                | _ -> () } |> Seq.isEmpty
+        if canFire then 
+            for p_i in 0..net.Connections.GetLength(1)-1 do
+                match net.Connections.[t_i, p_i] with
+                | To -> deltas.[p_i] <- deltas.[p_i] + 1
+                | From -> deltas.[p_i] <- deltas.[p_i] - 1
+                | _ -> ()
+    let places' = 
+        Array.map2 
+            (fun place delta -> { place with Value = place.Value + delta }) 
+            places
+            deltas
+    { net with Places = places' }

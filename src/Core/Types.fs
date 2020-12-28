@@ -11,15 +11,17 @@ type Node =
     | Transition of Transition
     with member this.Name = match this with Place { Name = name} | Transition {Name = name} -> name
 
-type Connection =
-    | PlaceToTransition of string * string
-    | TransitionToPlace of string * string
+type Connection = 
+    | None
+    | To
+    | From
+    | Loop
+    with 
+      static member IsLeft conn = match conn with From -> true | _ -> false
+
 
 type Network =
-    { Nodes: Node list
-      Connections: Connection list }
-    with 
-    member this.Place name = 
-        this.Nodes 
-        |> List.find ^ fun node -> node.Name = name
-        |> function Place p -> p | _ -> failwith $"Invalid place name %s{name}"
+  { Places: Place[]
+    Transitions: Transition[]
+    Connections: Connection[,] }
+    with member this.Place name = this.Places |> Array.find ^ fun p -> p.Name = name
