@@ -29,6 +29,8 @@ type Arc =
     /// <returns></returns>
     member this.Value = match this with NotExist -> 0 | To n -> n | From n -> -n
 
+    member this.Exist = match this with NotExist -> false | _ -> true
+
     /// <summary>
     /// Возвращает объект дуги, соответсвующий указанному значению в матрице инцедентности.
     /// </summary>
