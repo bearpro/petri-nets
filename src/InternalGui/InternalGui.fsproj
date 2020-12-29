@@ -11,10 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Lib\Lib.fsproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Avalonia.Desktop" Version="0.9.7" />
     <PackageReference Include="JaggerJo.Avalonia.FuncUI" Version="0.4.0" />
     <PackageReference Include="JaggerJo.Avalonia.FuncUI.DSL" Version="0.4.0" />
@@ -23,6 +19,10 @@
 
   <ItemGroup>
     <EmbeddedResource Remove=".template.config\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Core\Core.fsproj" />
   </ItemGroup>
 
 </Project>

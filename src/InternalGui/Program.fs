@@ -14,7 +14,7 @@ type MainWindow() as this =
         base.Title <- "Gui"
         base.Width <- 400.0
         base.Height <- 400.0
-        
+        this.AttachDevTools()
         //this.VisualRoot.VisualRoot.Renderer.DrawFps <- true
         //this.VisualRoot.VisualRoot.Renderer.DrawDirtyRects <- true
 

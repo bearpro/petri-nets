@@ -55,7 +55,7 @@ let private toCoreNetwork (root: QPNetNetwork.Root) =
             let transition = transitions |> Array.find (fun (_, n) -> n = x.Transition) |> fst
             (transition.Name, place.Name)
     
-    let arcs = Array2D.create transitions.Length places.Length Arc.None
+    let arcs = Array2D.create transitions.Length places.Length Arc.NotExist
     
     for t_i, (transition, _) in Array.indexed transitions do
         for p_i, (place, _) in Array.indexed places do

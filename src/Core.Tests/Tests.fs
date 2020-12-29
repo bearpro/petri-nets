@@ -42,8 +42,8 @@ let ``Chained transitions not fires same time`` () =
                     { Name = "p3"; Tokens = 0 } |]
     let transitions = [| { Name = "t1" }
                          { Name = "t2" } |]
-    let incidents = array2D [ [ From 1; To 1; None ]
-                              [ None; From 1; To 1 ] ]
+    let incidents = array2D [ [ From 1; To 1; NotExist ]
+                              [ NotExist; From 1; To 1 ] ]
     let net = makeNet places transitions incidents
     
     Some net
@@ -95,7 +95,7 @@ let ``Simple generator works`` () =
     let transitions = [| { Name = "t1" }
                          { Name = "t2" } |]
     let incidents = array2D [ [ From 1; To   1; To 1 ]
-                              [ To   1; From 1; None ] ] 
+                              [ To   1; From 1; NotExist ] ] 
     let net = makeNet places transitions incidents
     
     testTimes 6 (Some [1; 0; 3]) net |> ignore

@@ -1,6 +1,7 @@
-﻿namespace Gui
+﻿namespace InternalGui
 
-open Lib
+open Core.Types
+open Core.Utils
 
 module Counter =
     open Avalonia.Controls
@@ -16,22 +17,29 @@ module Counter =
     type ConnectionState =
     | PlaceToTransitionBegin
     | TransitionToPlaceBegin
+    
+    type ItemsDisplacement = list<float * float * string>
 
     type State = 
         { Network: Network 
           Mode: EditMode
-          PlacesCreated: int
-          TransitionsCreated: int
+          ItemsDisplacement: ItemsDisplacement
+          NextPlaceIndex: int
+          NextTransitionIndex: int
           ConnectionState: ConnectionState option }
     
     let init = 
+        let places = [| { Name = "p1"; Tokens = 1 }
+                        { Name = "p2"; Tokens = 0 } |]
+        let transitions = [| { Name = "t1" } |]
+        let arcs = array2D [ [ From 1; To 1 ] ] 
+        let net = { Places = places; Transitions = transitions; Arcs = arcs }
         { Mode = Cursor
-          Network = 
-            { Connections = []
-              Nodes = [] }
-          PlacesCreated = 0
-          TransitionsCreated = 0
-          ConnectionState = None }
+          Network = net
+          NextPlaceIndex = 3
+          NextTransitionIndex = 2
+          ItemsDisplacement = [ (25., 25., "p1"); (125., 25., "p2"); (75., 25., "t1");  ]
+          ConnectionState = Option.None }
 
     type Msg = 
     | AddNode of X: float * Y: float
@@ -39,55 +47,67 @@ module Counter =
 
     let update (msg: Msg) (state: State) : State =
         match msg with
-        | AddNode (X, Y) -> 
-            let newNode, pc, tc = 
+        | AddNode (x, y) -> 
+            let newNode, pc, tc, name = 
                 match state.Mode with
-                | AddPlace -> Place { Value = 1
-                                      Position = (X, Y)
-                                      Name = sprintf "p%i" state.PlacesCreated }, 
-                              state.PlacesCreated + 1, 
-                              state.TransitionsCreated
-                | AddTransition -> Transition { Position = (X, Y)
-                                                Name = sprintf "t%i" state.TransitionsCreated },
-                                   state.PlacesCreated, 
-                                   state.TransitionsCreated + 1
+                | AddPlace -> 
+                    let name = sprintf "p%i" state.NextPlaceIndex
+                    ( Place { Tokens = 1; Name = name }, 
+                      state.NextPlaceIndex + 1, 
+                      state.NextTransitionIndex,
+                      name )
+                | AddTransition -> 
+                    let name = sprintf "t%i" state.NextTransitionIndex
+                    ( Transition { Name = name },
+                      state.NextPlaceIndex, 
+                      state.NextTransitionIndex + 1,
+                      name )
                 | Cursor -> failwith "Невозможно добавить узел с в этом режиме."
             { state with 
-                Network = { state.Network with Nodes = newNode :: state.Network.Nodes }
-                PlacesCreated = pc
-                TransitionsCreated = tc }
+                Network = state.Network.AddNode newNode
+                NextPlaceIndex = pc
+                NextTransitionIndex = tc
+                ItemsDisplacement = (x, y, name) :: state.ItemsDisplacement }
         | ChangeMode mode -> { state with Mode = mode }
     
     let view (state: State) (dispatch) =
-        let getClick f (e: Avalonia.Input.PointerReleasedEventArgs) =
+        let inline getClick (e: Avalonia.Input.PointerEventArgs) =
             let x = (e.GetPosition null).X
             let y = (e.GetPosition null).Y
-            f (x, y)
-        let node n = 
+            (x, y)
+        
+        let nodeView (x, y, name) =
+            let node = state.Network.Node name
             let shape, x, y = 
-                match n with 
-                | Place { Position = (x, y) } ->
-                    Ellipse.create [
-                        Ellipse.width 25.0
-                        Ellipse.height 25.0
-                        Ellipse.fill "green"
-                    ] :> Avalonia.FuncUI.Types.IView,
+                match node with
+                | Place p ->
+                    Border.create [
+                        Border.borderBrush "black"
+                        Border.borderThickness 1.0
+                        Border.cornerRadius 12.5
+                        Border.child (
+                            Ellipse.create [
+                                Ellipse.width 25.0
+                                Ellipse.height 25.0
+                                Ellipse.fill "white"
+                            ] ) ] :> Avalonia.FuncUI.Types.IView,
                     (x - 12.5), (y - 12.5)
-                | Transition { Position = (x, y) } -> 
-                    Rectangle.create [
-                        Ellipse.width 15.0
-                        Ellipse.height 25.0
-                        Ellipse.fill "white"
-                    ] :> Avalonia.FuncUI.Types.IView,
+                | Transition t -> 
+                    Border.create [
+                         Border.borderBrush "black"
+                         Border.borderThickness 1.0
+                         Border.child (
+                            Rectangle.create [
+                                Ellipse.width 15.0
+                                Ellipse.height 25.0
+                                Ellipse.fill "white"
+                            ] ) ] :> Avalonia.FuncUI.Types.IView,
                     (x - 7.5), (y - 12.5)
             let label = 
                 TextBlock.create [
-                    TextBlock.foreground (
-                        match n with 
-                        | Transition _ -> "black"
-                        | Place _ -> "white" )
+                    TextBlock.foreground "black"
                     TextBlock.text (
-                        match n with
+                        match node with
                         | Transition { Name = name } 
                         | Place { Name = name } -> name )
                     TextBlock.verticalAlignment VerticalAlignment.Center
@@ -96,12 +116,46 @@ module Counter =
             Grid.create [
                 Canvas.left x
                 Canvas.top y
-                //Grid.onPointerReleased
+                Grid.zIndex 1
                 Grid.children [
                     shape
                     label
                 ] 
             ] :> Avalonia.FuncUI.Types.IView
+        
+        let arcsView net (arcs: Arc[,]) = seq {
+            for t_i in 0..net.Arcs.GetLength(0)-1 do
+                for p_i in 0..net.Arcs.GetLength(1)-1 do
+                    let arc = net.Arcs.[t_i, p_i]
+                    let pos = 
+                        match arc with 
+                        | NotExist -> None
+                        | From _ -> 
+                            let name1 = net.Places.[p_i].Name
+                            let name2 = net.Transitions.[t_i].Name
+                            let x1, y1, _ = state.ItemsDisplacement |> List.find ^ fun (_, _, name) -> name = name1
+                            let x2, y2, _ = state.ItemsDisplacement |> List.find ^ fun (_, _, name) -> name = name2
+                            Some (x1, y1, x2, y2)
+                        | To _ -> 
+                            let name1 = net.Transitions.[t_i].Name
+                            let name2 = net.Places.[p_i].Name
+                            let x1, y1, _ = state.ItemsDisplacement |> List.find ^ fun (_, _, name) -> name = name1
+                            let x2, y2, _ = state.ItemsDisplacement |> List.find ^ fun (_, _, name) -> name = name2
+                            Some (x1, y1, x2, y2)
+                    match pos with
+                    | Some (x1, y1, x2, y2) ->
+                        let line = Line.create [
+                            Line.startPoint (x1, y1)
+                            Line.endPoint (x2, y2)
+                            Line.strokeThickness 2.
+                            Line.stroke "black"
+                        ]
+                        yield line :> Avalonia.FuncUI.Types.IView
+                    | None -> ()
+        }
+
+        let arcsView = arcsView state.Network
+
         DockPanel.create [
             DockPanel.children [
                 Grid.create [
@@ -134,12 +188,18 @@ module Counter =
                     ]
                 ]
                 Canvas.create [ 
-                    Canvas.background "black"
+                    Canvas.background "white"
                     Canvas.onPointerReleased (
+                        printfn "Canvas.onPointerPressed"
                         match state.Mode with
-                        | AddPlace | AddTransition -> getClick ^ AddNode
+                        | AddPlace 
+                        | AddTransition -> fun e -> getClick e |> AddNode |> dispatch
                         | _ -> ignore )
-                    Canvas.children ^ List.map node state.Network.Nodes 
+                    Canvas.children (
+                        let nodes = List.map nodeView state.ItemsDisplacement
+                        let arcs = arcsView state.Network.Arcs |> List.ofSeq
+                        nodes @ arcs
+                    )
                 ]
             ]
         ]
