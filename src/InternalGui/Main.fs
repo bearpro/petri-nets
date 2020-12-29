@@ -3,7 +3,7 @@
 open Core.Types
 open Core.Utils
 
-module Counter =
+module Main =
     open Avalonia.Controls
     open Avalonia.Controls.Shapes
     open Avalonia.FuncUI.DSL
@@ -26,7 +26,8 @@ module Counter =
           ItemsDisplacement: ItemsDisplacement
           NextPlaceIndex: int
           NextTransitionIndex: int
-          ConnectionState: ConnectionState option }
+          ConnectionState: ConnectionState option
+          DraggingItem: string option }
     
     let init = 
         let places = [| { Name = "p1"; Tokens = 1 }
@@ -39,13 +40,17 @@ module Counter =
           NextPlaceIndex = 3
           NextTransitionIndex = 2
           ItemsDisplacement = [ (25., 25., "p1"); (125., 25., "p2"); (75., 25., "t1");  ]
-          ConnectionState = Option.None }
+          ConnectionState = Option.None
+          DraggingItem = None }
 
     type Msg = 
     | AddNode of X: float * Y: float
     | ChangeMode of EditMode
+    | ChangeDraggedItem of string option
+    | ChangeDraggedItemPosition of float * float
 
     let update (msg: Msg) (state: State) : State =
+        printfn "%A" msg
         match msg with
         | AddNode (x, y) -> 
             let newNode, pc, tc, name = 
@@ -69,9 +74,19 @@ module Counter =
                 NextTransitionIndex = tc
                 ItemsDisplacement = (x, y, name) :: state.ItemsDisplacement }
         | ChangeMode mode -> { state with Mode = mode }
-    
+        | ChangeDraggedItem (Some name) -> { state with DraggingItem = Some name }
+        | ChangeDraggedItem None -> { state with DraggingItem = None }
+        | ChangeDraggedItemPosition (x', y') when state.DraggingItem.IsSome -> 
+            let displacement = 
+                state.ItemsDisplacement 
+                |> List.map ^ fun (x, y, name) -> 
+                    if name = state.DraggingItem.Value then (x', y', name)
+                                                        else (x, y, name)
+            { state with ItemsDisplacement = displacement }
+        | ChangeDraggedItemPosition (x, y) -> state
+
     let view (state: State) (dispatch) =
-        let inline getClick (e: Avalonia.Input.PointerEventArgs) =
+        let inline getPointerPosition (e: Avalonia.Input.PointerEventArgs) =
             let x = (e.GetPosition null).X
             let y = (e.GetPosition null).Y
             (x, y)
@@ -116,12 +131,17 @@ module Counter =
             Grid.create [
                 Canvas.left x
                 Canvas.top y
+                Grid.onPointerPressed ^ fun e ->
+                    e.Handled <- true
+                    if state.DraggingItem.IsNone then ChangeDraggedItem (Some name) |> dispatch
+                Grid.onPointerReleased ^ fun e -> 
+                    e.Handled <- true
+                    ChangeDraggedItem None |> dispatch
                 Grid.zIndex 1
                 Grid.children [
                     shape
                     label
-                ] 
-            ] :> Avalonia.FuncUI.Types.IView
+                ] ] :> Avalonia.FuncUI.Types.IView
         
         let arcsView net (arcs: Arc[,]) = seq {
             for t_i in 0..net.Arcs.GetLength(0)-1 do
@@ -187,13 +207,19 @@ module Counter =
                         ]
                     ]
                 ]
-                Canvas.create [ 
+                Canvas.create [
                     Canvas.background "white"
+                    Canvas.onPointerMoved (
+                        fun e -> 
+                        e.Handled <- true
+                        let x, y = getPointerPosition e
+                        ChangeDraggedItemPosition (x, y) |> dispatch )
                     Canvas.onPointerReleased (
-                        printfn "Canvas.onPointerPressed"
                         match state.Mode with
                         | AddPlace 
-                        | AddTransition -> fun e -> getClick e |> AddNode |> dispatch
+                        | AddTransition -> fun e -> 
+                            e.Handled <- true 
+                            getPointerPosition e |> AddNode |> dispatch
                         | _ -> ignore )
                     Canvas.children (
                         let nodes = List.map nodeView state.ItemsDisplacement

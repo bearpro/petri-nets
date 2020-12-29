@@ -19,7 +19,7 @@ type MainWindow() as this =
         //this.VisualRoot.VisualRoot.Renderer.DrawDirtyRects <- true
 
 
-        Elmish.Program.mkSimple (fun () -> Counter.init) Counter.update Counter.view
+        Elmish.Program.mkSimple (fun () -> Main.init) Main.update Main.view
         |> Program.withHost this
         |> Program.run
 
