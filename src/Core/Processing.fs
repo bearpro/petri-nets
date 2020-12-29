@@ -1,9 +1,10 @@
 module Core.Processing
 
-open System
-open System.Collections.Generic
 open Core.Types
 
+/// <summary>
+/// Представляет разницу между количеством меток до и после выполнения шага.
+/// </summary>
 type private Delta = 
     { Add: int; Sub: int }
     with
@@ -11,6 +12,12 @@ type private Delta =
     member this.Dec n = { this with Sub = this.Sub + n}
     member this.Value = this.Add - this.Sub
 
+
+/// <summary>
+/// Выполняет шаг ("fire") сети петри, если это возможно. Возвращает сеть с обновлёнными значениями
+/// количества меток в позициях. Если возможных переходов нет - возвращает None.
+/// </summary>
+/// <param name="net">Суть, над которой нужно совершить переход.</param>
 let fire net = 
     let places = net.Places
     let deltas = Array.create places.Length { Add = 0; Sub = 0 }

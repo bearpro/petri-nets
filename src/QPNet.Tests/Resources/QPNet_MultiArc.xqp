@@ -1,0 +1,20 @@
+﻿<objects>
+  <place x="25" y="125" n="0" value="1" name="p1"/>
+  <place x="250" y="100" n="1" value="0" name="p2"/>
+  <transition x="125" y="150" distr="0" priority="0" n="0" name="t1">
+    <distr_options value="0"/>
+  </transition>
+  <arc-tp place="1" x="200" y="125" transition="0" distr="0" block="0" block_type="0">
+    <distr_options value="1"/>
+  </arc-tp>
+  <arc-pt place="0" x="75" y="125" transition="0" distr="0" block="0" block_type="0">
+    <distr_options value="1"/>
+  </arc-pt>
+  <arc-pt place="0" x="75" y="150" transition="0" distr="0" block="0" block_type="0">
+    <distr_options value="1"/>
+  </arc-pt>
+</objects>
+<format_version major="1" minor="2"/>
+<global_options>
+  <transitions nonHolding="0"/>
+</global_options>
