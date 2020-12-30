@@ -4,11 +4,12 @@ open Avalonia.Controls
 open Avalonia.Controls.Shapes
 open Avalonia.FuncUI.DSL
 open Avalonia.Layout
-
 open Core.Types
 open Core.Utils
-open InternalGui.Utils
+open Elmish
 open InternalGui.Types
+open InternalGui.Utils
+open System.IO
 
 type State = 
     { Network: Network 
@@ -17,9 +18,11 @@ type State =
       Counters: Counters
       ConnectionState: ConnectionState option
       DraggingItem: string option
-      PlaceShapeRadius: float }
+      PlaceShapeRadius: float
+      Window: Window
+      CurrentFileName: string }
 
-let init = 
+let init window = 
     let places = [| { Name = "p1"; Tokens = 50 }
                     { Name = "p2"; Tokens = 0 } |]
     let transitions = [| { Name = "t1" } |]
@@ -28,10 +31,12 @@ let init =
     { Mode = Cursor
       Network = net
       Counters = { Places = 3; Transitions = 2 }
-      ItemsDisplacement = [ (25., 25., "p1"); (125., 25., "p2"); (75., 25., "t1");  ]
+      ItemsDisplacement = Map.ofList [ "p1", (25., 25.); "p2", (125., 25.); "t1", (75., 25.) ]
       ConnectionState = None
       DraggingItem = None
-      PlaceShapeRadius = 25.0 }
+      PlaceShapeRadius = 25.0
+      Window = window 
+      CurrentFileName = ""}
 
 type Msg = 
 | AddNode of X: float * Y: float
@@ -39,6 +44,9 @@ type Msg =
 | ChangeDraggedItem of string option
 | ChangeDraggedItemPosition of float * float
 | Fire
+| SelectFile
+| OpenFile of string[]
+| FileNameChanged of string
 
 let newNode mode counters = 
     match mode with
@@ -52,29 +60,45 @@ let addNode x y state =
     let newNode, counters, name = newNode state.Mode state.Counters
     { state with Network = state.Network.AddNode newNode
                  Counters = counters
-                 ItemsDisplacement = (x, y, name) :: state.ItemsDisplacement }
+                 ItemsDisplacement = Map.add name (x, y) state.ItemsDisplacement }
 
 let updatePosition x' y' state =
-    let displacement = [ 
-        for (x, y, name) in state.ItemsDisplacement ->
-            if name = state.DraggingItem.Value 
-            then (x', y', name)
-            else (x, y, name) ]
+    let name = Option.get state.DraggingItem
+    let displacement = state.ItemsDisplacement |> Map.change name ^ fun _ -> Some (x', y')
     { state with ItemsDisplacement = displacement }
- 
-let update (msg: Msg) (state: State) : State =
+
+let selectFile() = 
+    let d = OpenFileDialog(AllowMultiple = false)
+    let show () = d.ShowAsync(Window()) |> Async.AwaitTask
+    Cmd.OfAsync.perform show () OpenFile
+
+let openFile path = 
+    let path = path |> Array.exactlyOne
+    if File.Exists path then
+        let content = File.ReadAllText path
+        let net = QPNet.Data.parseNetwork content
+        let disp = QPNet.Data.parseDisplacement content
+        Some(net, disp)
+    else None
+
+let update (msg: Msg) (state: State) =
     printfn "%A" msg
     match msg with
-    | AddNode (x, y) -> addNode x y state
-    | ChangeMode mode -> { state with Mode = mode }
-    | ChangeDraggedItem (Some name) -> { state with DraggingItem = Some name }
-    | ChangeDraggedItem None -> { state with DraggingItem = None }
-    | ChangeDraggedItemPosition (x, y) when state.DraggingItem.IsSome -> updatePosition x y state
-    | Fire -> { state with Network = Core.Processing.fire state.Network |> Option.get }
-    | _ -> failwithf "Invalid msg %A for state %A" msg state
+    | AddNode (x, y) -> addNode x y state, Cmd.none
+    | ChangeMode mode -> { state with Mode = mode }, Cmd.none
+    | ChangeDraggedItem (Some name) -> { state with DraggingItem = Some name }, Cmd.none
+    | ChangeDraggedItem None -> { state with DraggingItem = None }, Cmd.none
+    | ChangeDraggedItemPosition (x, y) when state.DraggingItem.IsSome -> updatePosition x y state, Cmd.none
+    | Fire -> { state with Network = Core.Processing.fire state.Network |> Option.get }, Cmd.none
+    | SelectFile -> state, selectFile()
+    | OpenFile path -> match openFile path with
+                       | Some(net, disp) -> { state with Network = net; ItemsDisplacement = disp }, Cmd.none
+                       | None -> state, Cmd.none
+    | FileNameChanged path -> { state with CurrentFileName = path}, Cmd.ofMsg(OpenFile [|path|])
+    | _ -> failwithf "Invalid msg %A for state %A" msg state, Cmd.none
 
 let nodeView state dispatch = [
-    for (x, y, name) in state.ItemsDisplacement -> 
+    for name, (x, y) in Map.toSeq state.ItemsDisplacement -> 
         let node = state.Network.Node name
         let shape, x, y = 
             match node with
@@ -104,6 +128,7 @@ let nodeView state dispatch = [
         let label = 
             TextBlock.create [
                 TextBlock.foreground "black"
+                TextBlock.background "white"
                 TextBlock.text (
                     match node with
                     | Transition t -> t.Name
@@ -137,8 +162,8 @@ let private arcCoordinates (arc: Arc) t_i p_i (net: Network) (displacement: Item
             | From _ -> fun (a, b) -> (a, b)
             | To _ -> fun (a, b) -> (b, a)
             | NotExist -> failwith "Critical error"
-        let x1, y1, _ = List.find (fun (_, _, name) -> name = point) displacement
-        let x2, y2, _ = List.find (fun (_, _, name) -> name = trans) displacement 
+        let x1, y1 = displacement.[point]
+        let x2, y2 = displacement.[trans]
         Some (order ((x1, y1), (x2, y2)))
     else None
 
@@ -151,11 +176,20 @@ let private arcsView state _ =
                   let arc = arcs.[t_i, p_i]
                   match arcCoordinates arc t_i p_i net displacement with
                   | Some ((x1, y1),( x2, y2)) ->
-                      let line = Line.create [
-                          Line.startPoint (x1, y1)
-                          Line.endPoint (x2, y2)
-                          Line.strokeThickness 2.
-                          Line.stroke "black"
+                      let line = 
+                          Grid.create [
+                              Grid.children [
+                                  Line.create [
+                                      Line.startPoint (x1, y1)
+                                      Line.endPoint (x2, y2)
+                                      Line.strokeThickness 2.
+                                      Line.stroke (if arc.IsFromPlace then "black" else "green")
+                                  ]
+                                  //TextBlock.create [
+                                  //    TextBlock.text (string arc.Value)
+                                  //    TextBlock.background "white"
+                                  //]
+                          ]
                       ]
                       yield line :> Avalonia.FuncUI.Types.IView
                   | None -> ()
@@ -179,6 +213,25 @@ let private workspace state dispatch =
             e.Handled <- true
             let x, y = getPointerPosition e
             ChangeDraggedItemPosition (x, y) |> dispatch ))
+
+let private menuPanel state dispatch =
+    StackPanel.create [
+        DockPanel.dock Dock.Bottom
+        StackPanel.orientation Orientation.Horizontal
+        StackPanel.children [
+            TextBlock.create [
+                TextBlock.text "Open file: "
+            ]
+            //Button.create [
+            //    Button.onClick ^ fun e -> dispatch SelectFile
+            //    Button.content "Open"
+            //]
+            TextBox.create [
+                TextBox.width 200.
+                TextBox.onTextChanged ^ fun e -> dispatch (FileNameChanged e)
+            ]
+        ]
+    ]
 
 let private toolPanel state dispatch =
     Grid.create [
@@ -222,6 +275,7 @@ let private toolPanel state dispatch =
 let view (state: State) (dispatch) =
     DockPanel.create [
         DockPanel.children [
+            menuPanel state dispatch
             toolPanel state dispatch
             workspace state dispatch
         ]
