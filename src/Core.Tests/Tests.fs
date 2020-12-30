@@ -25,7 +25,6 @@ let rec private testTimes times (result: int list Option) net =
             Option.None
         |> Option.bind ^ testTimes (times - 1) result
 
-
 [<Fact>]
 let ``Network of 2 places fires correctly`` () =
     let places = [| { Name = "p1"; Tokens = 1 }
@@ -99,3 +98,13 @@ let ``Simple generator works`` () =
     let net = makeNet places transitions incidents
     
     testTimes 6 (Some [1; 0; 3]) net |> ignore
+
+[<Fact>]
+let ``Net not fires when no transactions avaliable`` () =
+    let places = [| { Name = "p1"; Tokens = 0 }
+                    { Name = "p2"; Tokens = 0 } |]
+    let transitions = [| { Name = "t1" } |]
+    let incidents = array2D [ [ From 1; To 1 ] ] 
+    let net = makeNet places transitions incidents
+    
+    test Option.None net |> ignore
