@@ -34,7 +34,7 @@ type private QPNetNetwork = XmlProvider<"""<root><objects>
 
 let private addRoot qpnetFileContent = $"<root>%s{qpnetFileContent}</root>"
 
-let private toCoreNetwork (root: QPNetNetwork.Root) =
+let private getCoreNetwork (root: QPNetNetwork.Root) =
     let places = 
         root.Objects.Places
         |> Array.map ^ fun x -> { Name = x.Name; Tokens = x.Value }, x.N
@@ -68,9 +68,21 @@ let private toCoreNetwork (root: QPNetNetwork.Root) =
       Transitions = Array.map fst transitions
       Arcs = arcs }
 
+let private getItemsDisplacement (root: QPNetNetwork.Root) : ItemsDisplacement =
+    let placesDisplacements = 
+        root.Objects.Places
+        |> Seq.map ^ fun place -> place.Name, (float place.X, float place.Y)
+
+    let transitionsDisplacements =
+        root.Objects.Transitions
+        |> Seq.map ^ fun transition -> transition.Name, (float transition.X, float transition.Y)
+
+    Map.ofSeq (Seq.concat [placesDisplacements; transitionsDisplacements])
+
 /// <summary>
 /// Принимает строку сериализованного содержимого файла модели QPNet (в формате XQP). 
 /// Возвращает соответствующий экземпляр Network.
 /// </summary>
 /// <remarks> Может не поддерживать некоторые фишки QPNet </remarks>
-let parse = addRoot >> QPNetNetwork.Parse >> toCoreNetwork
+let parseNetwork = addRoot >> QPNetNetwork.Parse >> getCoreNetwork
+let parseDisplacement = addRoot >> QPNetNetwork.Parse >> getItemsDisplacement

@@ -3,7 +3,6 @@
 open Elmish
 open Avalonia
 open Avalonia.Controls.ApplicationLifetimes
-open Avalonia.Input
 open Avalonia.FuncUI
 open Avalonia.FuncUI.Elmish
 open Avalonia.FuncUI.Components.Hosts
@@ -11,15 +10,17 @@ open Avalonia.FuncUI.Components.Hosts
 type MainWindow() as this =
     inherit HostWindow()
     do
-        base.Title <- "Gui"
+        base.Title <- "Petri net studio (internal)"
         base.Width <- 400.0
         base.Height <- 400.0
         this.AttachDevTools()
         //this.VisualRoot.VisualRoot.Renderer.DrawFps <- true
         //this.VisualRoot.VisualRoot.Renderer.DrawDirtyRects <- true
 
-
-        Elmish.Program.mkSimple (fun () -> Main.init) Main.update Main.view
+        Program.mkProgram 
+            (fun _ -> Main.init this, Cmd.none)
+            (Main.update)
+            (Main.view)
         |> Program.withHost this
         |> Program.run
 

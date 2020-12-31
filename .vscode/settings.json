@@ -1,3 +1,8 @@
 {
-    "dotnet-test-explorer.testProjectPath": "**/*Tests.@(csproj|vbproj|fsproj)"
+    "dotnet-test-explorer.testProjectPath": "**/*Tests.@(csproj|vbproj|fsproj)",
+    "cSpell.words": [
+        "Rects",
+        "Skia",
+        "avares"
+    ]
 }
