@@ -57,13 +57,13 @@ let private getCoreNetwork (root: QPNetNetwork.Root) =
     
     let arcs = Array2D.create transitions.Length places.Length Arc.NotExist
     
-    for t_i, (transition, _) in Array.indexed transitions do
-        for p_i, (place, _) in Array.indexed places do
+    for transitionIndex, (transition, _) in Array.indexed transitions do
+        for placeIndex, (place, _) in Array.indexed places do
             let inline countEntries x = Array.length << Array.where ^ (=) x
             let countFrom = arcsFrom |> countEntries (place.Name, transition.Name)
             let countTo = arcsTo |> countEntries (transition.Name, place.Name)
             let arc = Arc.OfValue (countTo - countFrom)
-            arcs.[t_i, p_i] <- Arc.Sum arcs.[t_i, p_i] arc
+            arcs.[transitionIndex, placeIndex] <- Arc.Sum arcs.[transitionIndex, placeIndex] arc
     { Places = Array.map fst places
       Transitions = Array.map fst transitions
       Arcs = arcs }
