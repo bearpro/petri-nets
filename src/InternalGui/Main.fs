@@ -17,7 +17,7 @@ type State =
       Counters: Counters
       ConnectionState: ConnectionState option
       DraggingItem: string option
-      PlaceShapeRadius: float }
+      BaseShapeRadius: float }
 
 let init = 
     let places = [| { Name = "p1"; Tokens = 50 }
@@ -28,10 +28,10 @@ let init =
     { Mode = Cursor
       Network = net
       Counters = { Places = 3; Transitions = 2 }
-      ItemsDisplacement = [ (25., 25., "p1"); (125., 25., "p2"); (75., 25., "t1");  ]
+      ItemsDisplacement = [ (25., 25., "p1"); (125., 25., "p2"); (75., 25., "t1"); ]
       ConnectionState = None
       DraggingItem = None
-      PlaceShapeRadius = 25.0 }
+      BaseShapeRadius = 40.0 }
 
 type Msg = 
 | AddNode of X: float * Y: float
@@ -74,6 +74,7 @@ let update (msg: Msg) (state: State) : State =
     | _ -> failwithf "Invalid msg %A for state %A" msg state
 
 let nodeView state dispatch = [
+    let r = state.BaseShapeRadius
     for (x, y, name) in state.ItemsDisplacement -> 
         let node = state.Network.Node name
         let shape, x, y = 
@@ -82,25 +83,25 @@ let nodeView state dispatch = [
                 Border.create [
                     Border.borderBrush "black"
                     Border.borderThickness 1.0
-                    Border.cornerRadius 12.5
+                    Border.cornerRadius (r / 2.0)
                     Border.child (
                         Ellipse.create [
-                            Ellipse.width 25.0
-                            Ellipse.height 25.0
+                            Ellipse.width r
+                            Ellipse.height r
                             Ellipse.fill "white"
                         ] ) ] :> Avalonia.FuncUI.Types.IView,
-                (x - 12.5), (y - 12.5)
+                (x - r / 2.), (y - r / 2.)
             | Transition t -> 
                 Border.create [
                      Border.borderBrush "black"
                      Border.borderThickness 1.0
                      Border.child (
                         Rectangle.create [
-                            Ellipse.width 15.0
-                            Ellipse.height 25.0
+                            Ellipse.width (r / 2. + 3.)
+                            Ellipse.height r
                             Ellipse.fill "white"
                         ] ) ] :> Avalonia.FuncUI.Types.IView,
-                (x - 7.5), (y - 12.5)
+                (x - (r / 2. + 3.) / 2.), (y - r / 2.)
         let label = 
             TextBlock.create [
                 TextBlock.foreground "black"
@@ -152,6 +153,8 @@ let private arcsView state _ =
                   match arcCoordinates arc t_i p_i net displacement with
                   | Some ((x1, y1),( x2, y2)) ->
                       let line = Line.create [
+                          Line.tip (string arc.Value)
+                          //Line.strokeDashArray ([3.])
                           Line.startPoint (x1, y1)
                           Line.endPoint (x2, y2)
                           Line.strokeThickness 2.
