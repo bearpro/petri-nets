@@ -3,6 +3,7 @@
 open Avalonia.Controls
 open Avalonia.Controls.Shapes
 open Avalonia.FuncUI.DSL
+open Avalonia.FuncUI.Types
 open Avalonia.Layout
 open Core.Types
 open Core.Utils
@@ -10,6 +11,7 @@ open Elmish
 open InternalGui.Types
 open InternalGui.Utils
 open System.IO
+open Avalonia.Media
 
 type State = 
     { Network: Network 
@@ -101,41 +103,44 @@ let nodeView state dispatch = [
     let r = state.BaseShapeRadius
     for name, (x, y) in Map.toSeq state.ItemsDisplacement -> 
         let node = state.Network.Node name
-        let shape, x, y = 
-            match node with
-            | Place p ->
+        let shape = 
                 Border.create [
                     Border.borderBrush "black"
                     Border.borderThickness 1.0
-                    Border.cornerRadius (r / 2.0)
-                    Border.child (
-                        Ellipse.create [
-                            Ellipse.width r
-                            Ellipse.height r
-                            Ellipse.fill "white"
-                        ] ) ] :> Avalonia.FuncUI.Types.IView,
-                (x - r / 2.), (y - r / 2.)
-            | Transition t -> 
-                Border.create [
-                     Border.borderBrush "black"
-                     Border.borderThickness 1.0
-                     Border.child (
-                        Rectangle.create [
-                            Ellipse.width (r / 2. + 3.)
-                            Ellipse.height r
-                            Ellipse.fill "white"
-                        ] ) ] :> Avalonia.FuncUI.Types.IView,
-                (x - (r / 2. + 3.) / 2.), (y - r / 2.)
+                    Border.horizontalAlignment HorizontalAlignment.Center
+                    Border.verticalAlignment VerticalAlignment.Center
+                    Border.cornerRadius (match node with Transition _ -> 0. | Place _ -> r / 2.)
+                    Border.child ( match node with
+                                 | Place p -> Ellipse.create [
+                                     Ellipse.width r
+                                     Ellipse.height r
+                                     Ellipse.fill "gray" ] :> IView 
+                                 | Transition t ->  Rectangle.create [
+                                     Rectangle.width (r / 2. + 3.)
+                                     Rectangle.height r
+                                     Rectangle.fill "white" ] :> IView ) ]
+        
+        let x, y = match node with
+                   | Place _ -> x - r / 2., y - r / 2.
+                   | Transition _ -> x - (r / 2. + 3.) / 2., y - r / 2.
         let label = 
-            TextBlock.create [
-                TextBlock.foreground "black"
-                TextBlock.background "white"
-                TextBlock.text (
-                    match node with
-                    | Transition t -> t.Name
-                    | Place p -> $"%s{p.Name}: %i{p.Tokens}" )
-                TextBlock.verticalAlignment VerticalAlignment.Center
-                TextBlock.horizontalAlignment HorizontalAlignment.Center
+            Border.create [
+                Border.borderThickness 1.0
+                Border.borderBrush (SolidColorBrush (Color (180uy, 170uy, 170uy,170uy) ) )
+                Border.verticalAlignment VerticalAlignment.Center
+                Border.horizontalAlignment HorizontalAlignment.Center
+                Border.child (
+                    TextBlock.create [
+                        TextBlock.foreground "black"
+                        TextBlock.background (SolidColorBrush (Color (125uy, 255uy, 255uy,255uy) ) )
+                        TextBlock.text (
+                            match node with
+                            | Transition t -> t.Name
+                            | Place p -> $"%s{p.Name}: %i{p.Tokens}" )
+                        TextBlock.verticalAlignment VerticalAlignment.Center
+                        TextBlock.horizontalAlignment HorizontalAlignment.Center
+                    ]
+                )
             ]
         Grid.create ([
             Canvas.left x
@@ -186,10 +191,6 @@ let private arcsView state _ =
                                       Line.strokeThickness 2.
                                       Line.stroke (if arc.IsFromPlace then "black" else "green")
                                   ]
-                                  //TextBlock.create [
-                                  //    TextBlock.text (string arc.Value)
-                                  //    TextBlock.background "white"
-                                  //]
                           ]
                       ]
                       yield line :> Avalonia.FuncUI.Types.IView
