@@ -34,7 +34,7 @@ type private QPNetNetwork = XmlProvider<"""<root><objects>
 
 let private addRoot qpnetFileContent = $"<root>%s{qpnetFileContent}</root>"
 
-let private toCoreNetwork (root: QPNetNetwork.Root) =
+let private getCoreNetwork (root: QPNetNetwork.Root) =
     let places = 
         root.Objects.Places
         |> Array.map ^ fun x -> { Name = x.Name; Tokens = x.Value }, x.N
@@ -55,22 +55,34 @@ let private toCoreNetwork (root: QPNetNetwork.Root) =
             let transition = transitions |> Array.find (fun (_, n) -> n = x.Transition) |> fst
             (transition.Name, place.Name)
     
-    let arcs = Array2D.create transitions.Length places.Length Arc.None
+    let arcs = Array2D.create transitions.Length places.Length Arc.NotExist
     
-    for t_i, (transition, _) in Array.indexed transitions do
-        for p_i, (place, _) in Array.indexed places do
+    for transitionIndex, (transition, _) in Array.indexed transitions do
+        for placeIndex, (place, _) in Array.indexed places do
             let inline countEntries x = Array.length << Array.where ^ (=) x
             let countFrom = arcsFrom |> countEntries (place.Name, transition.Name)
             let countTo = arcsTo |> countEntries (transition.Name, place.Name)
             let arc = Arc.OfValue (countTo - countFrom)
-            arcs.[t_i, p_i] <- Arc.Sum arcs.[t_i, p_i] arc
+            arcs.[transitionIndex, placeIndex] <- Arc.Sum arcs.[transitionIndex, placeIndex] arc
     { Places = Array.map fst places
       Transitions = Array.map fst transitions
       Arcs = arcs }
+
+let private getItemsDisplacement (root: QPNetNetwork.Root) : ItemsDisplacement =
+    let placesDisplacements = 
+        root.Objects.Places
+        |> Seq.map ^ fun place -> place.Name, (float place.X, float place.Y)
+
+    let transitionsDisplacements =
+        root.Objects.Transitions
+        |> Seq.map ^ fun transition -> transition.Name, (float transition.X, float transition.Y)
+
+    Map.ofSeq (Seq.concat [placesDisplacements; transitionsDisplacements])
 
 /// <summary>
 /// Принимает строку сериализованного содержимого файла модели QPNet (в формате XQP). 
 /// Возвращает соответствующий экземпляр Network.
 /// </summary>
 /// <remarks> Может не поддерживать некоторые фишки QPNet </remarks>
-let parse = addRoot >> QPNetNetwork.Parse >> toCoreNetwork
+let parseNetwork = addRoot >> QPNetNetwork.Parse >> getCoreNetwork
+let parseDisplacement = addRoot >> QPNetNetwork.Parse >> getItemsDisplacement

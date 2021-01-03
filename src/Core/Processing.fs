@@ -35,7 +35,7 @@ let fire net =
                     match net.Arcs.[t_i, p_i] with
                     | To n   -> deltas.[p_i].Inc n
                     | From n -> deltas.[p_i].Dec n
-                    | None   -> deltas.[p_i]
+                    | NotExist   -> deltas.[p_i]
                 deltas.[p_i] <- newDelta
     if transitionFound then
         let applyDelta place (delta: Delta) = { place with Tokens = place.Tokens + delta.Value }

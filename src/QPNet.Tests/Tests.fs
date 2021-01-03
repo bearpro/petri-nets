@@ -20,7 +20,7 @@ let loadResourceFile name =
 [<Fact>]
 let ``Basic sample parsed correctly`` () =
     let qpnetString = loadResourceFile "QPNet_Basic.xqp"
-    let net = QPNet.Data.parse qpnetString
+    let net = QPNet.Data.parseNetwork qpnetString
     
     let expectedPlaces = [| { Name = "p1"; Tokens = 1 }
                             { Name = "p2"; Tokens = 0 } |]
@@ -36,7 +36,7 @@ let ``Basic sample parsed correctly`` () =
 [<Fact>]
 let ``Multi arc sample parsed correctly`` () =
     let qpnetString = loadResourceFile "QPNet_MultiArc.xqp"
-    let net = QPNet.Data.parse qpnetString
+    let net = QPNet.Data.parseNetwork qpnetString
     
     let expectedPlaces = [| { Name = "p1"; Tokens = 1 }
                             { Name = "p2"; Tokens = 0 } |]
